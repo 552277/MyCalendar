@@ -1,0 +1,10 @@
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+.gradle
+local.properties
+MyCalendar.iml

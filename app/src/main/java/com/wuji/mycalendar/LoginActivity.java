@@ -2,9 +2,11 @@ package com.wuji.mycalendar;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.os.StrictMode;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
@@ -20,18 +22,35 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.text.TextUtils;
+import android.util.JsonReader;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.inputmethod.EditorInfo;
+import android.view.textclassifier.TextLinks;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONStringer;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import okhttp3.FormBody;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okio.BufferedSink;
 
 import static android.Manifest.permission.READ_CONTACTS;
 
@@ -44,6 +63,10 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
      * Id to identity READ_CONTACTS permission request.
      */
     private static final int REQUEST_READ_CONTACTS = 0;
+
+    private static final String CALENDAR_SERVER = "http://10.240.35.113:8080";
+
+    private static final String API_LOGIN = "/api/login";
 
     /**
      * A dummy authentication store containing known user names and passwords.
@@ -86,19 +109,75 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         Button mEmailSignInButton = (Button) findViewById(R.id.email_sign_in_button);
         mEmailSignInButton.setOnClickListener(new OnClickListener() {
             @Override
+            @SuppressLint("NewApi")
             public void onClick(View view) {
-                attemptLogin();
-                Intent intent = new Intent(LoginActivity.this, MainActivity.class);
-                startActivity(intent);
-                finish();
 
+                // 取消强制不能在主线程中请求网络的限制
+                StrictMode.ThreadPolicy policy=new StrictMode.ThreadPolicy.Builder().permitAll().build();
+                StrictMode.setThreadPolicy(policy);
+
+                Log.d("LoginActivity", "调用服务端接口");
+
+                try {
+                    JSONObject jsonObject = new JSONObject();
+                    String email = String.valueOf(mEmailView.getText());
+                    if(!isEmailValid(email)) {
+                        Toast.makeText(LoginActivity.this, "请输入正确格式的邮箱", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    jsonObject.put("email", email);
+                    jsonObject.put("password", mPasswordView.getText());
+                    final String jsonStr  = jsonObject.toString();
+
+                    OkHttpClient client = new OkHttpClient();
+                    Request request = new Request.Builder()
+                            .url(CALENDAR_SERVER + API_LOGIN)
+                            .post(RequestBody.create(
+                                    MediaType.parse("application/json; charset=utf-8"),
+                                    jsonStr))
+                            .build();
+                    Response response = client.newCall(request).execute();
+                    String responseData = response.body().string();
+                    //不能直接调用，会报错：Not supplying enough data to HAL，为什么？
+//                    parseJSONWithJSONObject(responseData);
+                    jsonObject = new JSONObject(responseData);
+                    int code = (int)jsonObject.get("code");
+                    if(code != 200) {
+                        String result = (String)jsonObject.get("msg");
+                        Toast.makeText(LoginActivity.this, result, Toast.LENGTH_SHORT).show();
+                        return;
+                    }else {
+                        Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+                        startActivity(intent);
+                        finish();
+                    }
+                }catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
+
         });
 
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
     }
 
+    private void parseJSONWithJSONObject(String jsonData) {
+        try {
+            JSONObject jsonObject = new JSONObject(jsonData);
+            int code = (int)jsonObject.get("code");
+            if(code != 200) {
+                String result = (String)jsonObject.get("msg");
+                Toast.makeText(LoginActivity.this, result, Toast.LENGTH_SHORT).show();
+                return;
+            }else {
+                Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+                startActivity(intent);
+            }
+        }catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
     private void populateAutoComplete() {
         if (!mayRequestContacts()) {
             return;
