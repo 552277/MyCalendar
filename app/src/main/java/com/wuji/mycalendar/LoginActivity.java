@@ -147,6 +147,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                         Toast.makeText(LoginActivity.this, result, Toast.LENGTH_SHORT).show();
                         return;
                     }else {
+                        Toast.makeText(LoginActivity.this, "登陆成功！", Toast.LENGTH_SHORT).show();
                         Intent intent = new Intent(LoginActivity.this, MainActivity.class);
                         startActivity(intent);
                         finish();
