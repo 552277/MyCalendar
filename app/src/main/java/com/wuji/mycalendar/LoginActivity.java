@@ -117,6 +117,9 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                 StrictMode.setThreadPolicy(policy);
 
                 Log.d("LoginActivity", "调用服务端接口");
+                // 临时 解除登陆校验，直接跳转
+                Intent intent2 = new Intent(LoginActivity.this, MainActivity.class);
+                startActivity(intent2);
 
                 try {
                     JSONObject jsonObject = new JSONObject();
